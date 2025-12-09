@@ -134,12 +134,36 @@ The built application will be in `src-tauri/target/release/bundle/`.
 
 ## Configuration
 
-The app runs with sensible defaults for the PoC. Configuration options will be added in future versions.
+The app automatically detects browsers and AI assistants to enable paste anonymization. You can customize which apps trigger this behavior by editing `config.json`:
+
+```json
+{
+  "auto_anonymize": {
+    "browsers": [
+      "chrome", "firefox", "edge", "safari", "brave", "opera", "vivaldi", "arc"
+    ],
+    "ai_assistants": [
+      "chatgpt", "claude", "gemini", "copilot", "openai", "anthropic", "bard", "perplexity", "poe"
+    ],
+    "custom_apps": []
+  }
+}
+```
+
+### How It Works
+
+The app checks both the **window title** and **app name** for these keywords. For example:
+- Browser tab titled "ChatGPT - Chrome" → matches "chrome" and "chatgpt"
+- Claude desktop app → matches "claude"
+- Custom app with "notion" in title → add "notion" to `custom_apps`
+
+The config file is created automatically on first run if it doesn't exist. Edit it to add or remove apps from the auto-anonymization list.
 
 ## Project Structure
 
 ```
 app-presidio/
+├── config.json             # Auto-anonymization configuration
 ├── index.html              # Main HTML entry point
 ├── package.json            # Node.js dependencies
 ├── vite.config.js          # Vite bundler config
@@ -154,6 +178,7 @@ app-presidio/
 │       ├── main.rs         # App entry point
 │       ├── lib.rs          # Core Tauri setup
 │       ├── clipboard.rs    # Clipboard monitoring
+│       ├── config.rs       # Configuration management
 │       ├── sidecar.rs      # Presidio sidecar management
 │       └── window.rs       # Active window detection
 ├── sidecar/

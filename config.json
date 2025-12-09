@@ -1,0 +1,26 @@
+{
+  "auto_anonymize": {
+    "browsers": [
+      "chrome",
+      "firefox",
+      "edge",
+      "safari",
+      "brave",
+      "opera",
+      "vivaldi",
+      "arc"
+    ],
+    "ai_assistants": [
+      "chatgpt",
+      "claude",
+      "gemini",
+      "copilot",
+      "openai",
+      "anthropic",
+      "bard",
+      "perplexity",
+      "poe"
+    ],
+    "custom_apps": []
+  }
+}

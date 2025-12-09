@@ -1,4 +1,5 @@
 mod clipboard;
+mod config;
 mod sidecar;
 mod window;
 
@@ -15,16 +16,19 @@ use tauri::{
     AppHandle, Emitter, Manager, RunEvent, State,
 };
 
-/// Check if the active window is a browser
-fn is_browser_window(app_name: &str) -> bool {
-    let app_name_lower = app_name.to_lowercase();
-    app_name_lower.contains("chrome")
-        || app_name_lower.contains("firefox")
-        || app_name_lower.contains("edge")
-        || app_name_lower.contains("safari")
-        || app_name_lower.contains("brave")
-        || app_name_lower.contains("opera")
-        || app_name_lower.contains("vivaldi")
+/// Check if we should auto-anonymize for this window based on configured keywords
+fn should_auto_anonymize(window_info: &window::WindowInfo, keywords: &[String]) -> bool {
+    // Check app_name first if available
+    if let Some(ref app_name) = window_info.app_name {
+        let app_name_lower = app_name.to_lowercase();
+        if keywords.iter().any(|keyword| app_name_lower.contains(keyword)) {
+            return true;
+        }
+    }
+
+    // Fallback to checking window title (important for Windows)
+    let title_lower = window_info.title.to_lowercase();
+    keywords.iter().any(|keyword| title_lower.contains(keyword))
 }
 
 /// Shared state for keyboard hook (needs to be 'static for rdev callback)
@@ -37,16 +41,21 @@ pub struct AppState {
     last_clipboard_hash: Mutex<u64>,
     clipboard_handled: Mutex<bool>,
     pending_anonymization: Arc<Mutex<Option<String>>>,
+    config: config::Config,
 }
 
 impl AppState {
     pub fn new() -> Self {
+        let config = config::Config::load();
+        log::info!("Loaded config with {} keywords", config.get_all_keywords().len());
+
         Self {
             clipboard_watcher: Mutex::new(None),
             sidecar: Arc::new(tokio::sync::Mutex::new(PresidioSidecar::new())),
             last_clipboard_hash: Mutex::new(0),
             clipboard_handled: Mutex::new(false),
             pending_anonymization: Arc::new(Mutex::new(None)),
+            config,
         }
     }
 }
@@ -57,19 +66,17 @@ fn try_anonymize_for_browser(
     app_handle: &AppHandle,
     trigger: &str,
 ) {
-    // Check if we're in a browser
+    // Check if we're in a browser or AI assistant app
     if let Some(window_info) = window::get_active_window() {
-        let is_browser = window_info
-            .app_name
-            .as_ref()
-            .map(|name| is_browser_window(name))
-            .unwrap_or(false);
+        let state = app_handle.state::<AppState>();
+        let keywords = state.config.get_all_keywords();
+        let should_anonymize = should_auto_anonymize(&window_info, &keywords);
 
-        if is_browser {
+        if should_anonymize {
             // Check if we have pending anonymization
             let mut pending = pending_anonymization.lock();
             if let Some(anonymized_text) = pending.take() {
-                let app_name = window_info.app_name.as_deref().unwrap_or("browser");
+                let app_name = window_info.app_name.as_deref().unwrap_or("app");
                 log::info!(
                     "{} in browser detected! Auto-anonymizing for: {}",
                     trigger,
@@ -243,20 +250,21 @@ async fn start_monitoring(app_handle: AppHandle, state: State<'_, AppState>) -> 
                 }
             }
 
-            // Update active window info periodically and auto-anonymize in browsers
+            // Update active window info periodically and auto-anonymize in browsers/AI apps
             if let Some(window_info) = window::get_active_window() {
-                // Check if we're in a browser and have pending anonymization
-                let is_browser = if let Some(ref app_name) = window_info.app_name {
-                    let result = is_browser_window(app_name);
-                    if result {
-                        log::debug!("Browser detected: {}", app_name);
-                    }
-                    result
-                } else {
-                    false
+                // Check if we're in a browser or AI assistant app
+                let keywords = {
+                    let state = app_handle_clone.state::<AppState>();
+                    state.config.get_all_keywords()
                 };
+                let should_anonymize = should_auto_anonymize(&window_info, &keywords);
+                if should_anonymize {
+                    log::debug!("Auto-anonymize target detected: {} ({})",
+                        window_info.app_name.as_deref().unwrap_or("unknown"),
+                        window_info.title);
+                }
 
-                if is_browser {
+                if should_anonymize {
                     let state = app_handle_clone.state::<AppState>();
                     let mut pending = state.pending_anonymization.lock();
 
