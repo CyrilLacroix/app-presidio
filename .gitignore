@@ -48,3 +48,7 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+
+# Tauri
+src-tauri/binaries
