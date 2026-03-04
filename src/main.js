@@ -509,8 +509,9 @@ async function handleIgnore() {
   updateDashboard();
   try {
     await invoke('mark_clipboard_handled');
+    await invoke('clear_token_vault');
   } catch (error) {
-    console.error('Failed to mark clipboard as handled:', error);
+    console.error('Failed to handle ignore:', error);
   }
 }
 
