@@ -544,6 +544,9 @@ async function handleToggleMonitoring() {
     elements.statusToggle.title = nowPaused ? 'Resume monitoring' : 'Pause monitoring';
   } catch (err) {
     console.error('Failed to toggle monitoring:', err);
+    elements.statusDot.className = 'status-dot' + (state.monitoring ? ' active' : ' paused');
+    elements.statusLabel.textContent = state.monitoring ? 'Monitoring' : 'Paused';
+    elements.statusToggle.title = state.monitoring ? 'Pause monitoring' : 'Resume monitoring';
   }
 }
 
