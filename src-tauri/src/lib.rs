@@ -71,6 +71,7 @@ fn set_tray_icon(app: &AppHandle, r: u8, g: u8, b: u8) {
 const TRAY_IDLE: (u8, u8, u8) = (34, 197, 94); // green  #22c55e
 const TRAY_WARNING: (u8, u8, u8) = (245, 158, 11); // orange #f59e0b
 const TRAY_DANGER: (u8, u8, u8) = (239, 68, 68); // red    #ef4444
+const TRAY_PAUSED: (u8, u8, u8) = (100, 100, 100); // grey  (paused)
 
 /// Returns true if the entity type is a secret/credential (vs personal PII).
 fn is_secret_entity(entity_type: &str) -> bool {
@@ -211,6 +212,8 @@ pub struct AppState {
     pending_tokenization: Arc<Mutex<Option<TokenizationResult>>>,
     /// In-memory session history (never persisted to disk)
     history: Arc<Mutex<Vec<HistoryEntry>>>,
+    /// Whether clipboard monitoring is paused by the user
+    monitoring_paused: Arc<AtomicBool>,
 }
 
 impl AppState {
@@ -229,6 +232,7 @@ impl AppState {
             token_vault: Arc::new(Mutex::new(TokenVault::new())),
             pending_tokenization: Arc::new(Mutex::new(None)),
             history: Arc::new(Mutex::new(Vec::new())),
+            monitoring_paused: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -422,6 +426,7 @@ async fn start_monitoring(app_handle: AppHandle, state: State<'_, AppState>) -> 
     let sidecar = state.sidecar.clone();
     let token_vault = state.token_vault.clone();
     let history = state.history.clone();
+    let monitoring_paused = state.monitoring_paused.clone();
     let app_handle_clone = app_handle.clone();
 
     tokio::spawn(async move {
@@ -429,6 +434,11 @@ async fn start_monitoring(app_handle: AppHandle, state: State<'_, AppState>) -> 
 
         loop {
             interval.tick().await;
+
+            // Skip processing when monitoring is paused
+            if monitoring_paused.load(Ordering::SeqCst) {
+                continue;
+            }
 
             // Get current clipboard content
             if let Some(text) = clipboard::get_clipboard_text() {
@@ -795,6 +805,33 @@ async fn get_config(state: State<'_, AppState>) -> Result<config::Config, String
     Ok(config.clone())
 }
 
+/// Toggle clipboard monitoring on/off; returns true when now paused
+#[tauri::command]
+async fn toggle_monitoring(
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let was_paused = state.monitoring_paused.load(Ordering::SeqCst);
+    let now_paused = !was_paused;
+    state.monitoring_paused.store(now_paused, Ordering::SeqCst);
+
+    if now_paused {
+        let (r, g, b) = TRAY_PAUSED;
+        set_tray_icon(&app_handle, r, g, b);
+        if let Some(tray) = app_handle.tray_by_id("pii-tray") {
+            let _ = tray.set_tooltip(Some("PII Shield — paused"));
+        }
+    } else {
+        let (r, g, b) = TRAY_IDLE;
+        set_tray_icon(&app_handle, r, g, b);
+        if let Some(tray) = app_handle.tray_by_id("pii-tray") {
+            let _ = tray.set_tooltip(Some("PII Shield — monitoring"));
+        }
+    }
+
+    Ok(now_paused)
+}
+
 /// Save updated configuration to disk
 #[tauri::command]
 async fn save_config(new_config: config::Config, state: State<'_, AppState>) -> Result<(), String> {
@@ -862,6 +899,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_monitoring,
             mark_clipboard_handled,
+            toggle_monitoring,
             get_sidecar_status,
             get_token_vault,
             clear_token_vault,

@@ -18,6 +18,7 @@ let state = {
   history: [],
   config: null,
   sidecarReady: false,
+  monitoring: true,
 };
 
 // ── DOM Elements ─────────────────────────────────────────────────────────────
@@ -53,6 +54,8 @@ const elements = {
   // Header
   activeWindow: document.getElementById('active-window'),
   statusLabel: document.getElementById('status-label'),
+  statusDot: document.getElementById('status-dot'),
+  statusToggle: document.getElementById('status-toggle'),
   toastContainer: document.getElementById('toast-container'),
   // History
   historyList: document.getElementById('history-list'),
@@ -532,6 +535,21 @@ function handleClearHistory() {
   renderHistory();
 }
 
+async function handleToggleMonitoring() {
+  try {
+    const nowPaused = await invoke('toggle_monitoring');
+    state.monitoring = !nowPaused;
+    elements.statusDot.className = 'status-dot' + (nowPaused ? ' paused' : ' active');
+    elements.statusLabel.textContent = nowPaused ? 'Paused' : 'Monitoring';
+    elements.statusToggle.title = nowPaused ? 'Resume monitoring' : 'Pause monitoring';
+  } catch (err) {
+    console.error('Failed to toggle monitoring:', err);
+    elements.statusDot.className = 'status-dot' + (state.monitoring ? ' active' : ' paused');
+    elements.statusLabel.textContent = state.monitoring ? 'Monitoring' : 'Paused';
+    elements.statusToggle.title = state.monitoring ? 'Pause monitoring' : 'Resume monitoring';
+  }
+}
+
 // ── Tauri Event Listeners ─────────────────────────────────────────────────────
 
 async function initTauriListeners() {
@@ -614,6 +632,7 @@ async function init() {
 
   elements.btnTokenize?.addEventListener('click', handleTokenize);
   elements.btnIgnore?.addEventListener('click', handleIgnore);
+  elements.statusToggle?.addEventListener('click', handleToggleMonitoring);
   elements.btnClearHistory?.addEventListener('click', handleClearHistory);
   elements.vaultClearAll?.addEventListener('click', handleClearVault);
   elements.btnViewVault?.addEventListener('click', () => {
