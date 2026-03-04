@@ -26,16 +26,15 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
 }
 
 #app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  max-width: 480px;
-  margin: 0 auto;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* Header */
@@ -47,6 +46,7 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
   -webkit-app-region: drag;
+  flex-shrink: 0;
 }
 
 .logo {
@@ -84,6 +84,22 @@ body {
   animation: pulse 2s infinite;
 }
 
+.status-dot.paused {
+  background: var(--text-muted);
+  box-shadow: none;
+  animation: none;
+}
+
+.status-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -97,6 +113,9 @@ body {
   flex-direction: column;
   gap: 20px;
   overflow-y: auto;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .section {
@@ -379,6 +398,7 @@ body {
   background: var(--bg-secondary);
   font-size: 12px;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 /* Toast Notifications */
@@ -470,6 +490,7 @@ body {
   padding: 0 20px;
   gap: 4px;
   -webkit-app-region: no-drag;
+  flex-shrink: 0;
 }
 
 .tab-btn {
